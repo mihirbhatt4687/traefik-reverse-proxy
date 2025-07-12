@@ -1,0 +1,81 @@
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik1
+    command:
+      - --api.insecure=true
+      - --api.dashboard=true
+      - --providers.docker
+      - --entryPoints.web.address=:80
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - web
+
+  laravel:
+    build: .
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.laravel.rule=Host(`laravel.localhost`)"
+      - "traefik.http.routers.laravel.entrypoints=web"
+    volumes:
+      - ./doc-root:/var/www/html/
+      - ./apache2.conf:/etc/apache2/sites-enabled/000-default.conf
+    # ports:
+    #   - 8090:80
+  
+  mysql:
+    image: mysql:8.0 # MySQL 8 image
+    environment:
+      MYSQL_ROOT_PASSWORD: root  # Root password for MySQL
+      MYSQL_DATABASE: laravel            # Default database
+      MYSQL_USER: laravel              # MySQL user
+      MYSQL_PASSWORD: b5cm0lhfPm31 # MySQL user password
+    networks:
+      - web
+    volumes:
+      - ./mysql_data/:/var/lib/mysql
+  
+  wordpress:
+    image: wordpress:latest
+    container_name: wordpress-proxy
+    # ports:
+    #   - "80:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - ./wordpress_data:/var/www/html
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wordpress.rule=Host(`wp.localhost`)"
+      - "traefik.http.routers.wordpress.entrypoints=web"
+    networks:
+      - web
+    command: >
+      bash -c "apachectl -D FOREGROUND"
+
+  db:
+    image: mysql:5.7
+    container_name: db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    volumes:
+      - ./db:/var/lib/mysql
+    networks:
+      - web
+
+
+networks:
+  web:
+    driver: bridge
